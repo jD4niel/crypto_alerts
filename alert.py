@@ -18,9 +18,12 @@ if not(CHAT_ID or TOKEN):
     logging.error(" === NOT TELEGRAM CHAT_ID OR TOKEN  ===")
     #sys.exit()
 
-def send_message(message):
-    url =  "https://api.telegram.org/bot" + TOKEN
+def send_message(message, not_send_message):
+    if not_send_message:
+        print(message)
+        return message
 
+    url =  "https://api.telegram.org/bot" + TOKEN
     if message:
         send_message = f"/sendMessage?chat_id={CHAT_ID}&text={message}"
         base_url = url + send_message
@@ -79,7 +82,7 @@ def parse_interval(interval):
         raise ValueError(f"Invalid interval format: {interval}")
 
 
-def main(interval, up, down):
+def main(interval, up, down, show_logs, not_send_message):
     interval_td = parse_interval(interval)
     while True:
         symbols = get_all_symbols()
@@ -87,22 +90,23 @@ def main(interval, up, down):
         for symbol in symbols:
             try:
                 rsi = get_rsi(symbol, interval, 14)
-                logging.info(f"{datetime.now().strftime('%H:%M:%S %d-%m-%Y')} - {symbol} RSI: {rsi} ")
+                if not show_logs:
+                    logging.info(f"{datetime.now().strftime('%H:%M:%S %d-%m-%Y')} - {symbol} RSI: {rsi} ")
                 if isinstance(rsi, float):
                     if rsi > up:
                         message += f"{symbol} RSI-{ interval } { rsi } above {up} SHORT\n"
-                        logging.info(message)
                     elif rsi < down:
                         message += f"{symbol} RSI { interval } { rsi } below {down} LONG\n"
-                    
-                if message:
-                    logging.info(message)
 
             except Exception as e:
                 message += f"Error getting RSI { interval } { rsi } for {symbol}: {e}\n"
                 logging.error(message)
-        
-        send_message(message)
+
+        if message:
+            logging.info(message)
+            send_message(message, not_send_message)
+        else:
+            logging.error("\n\n- - -   NOT TRADE OPPORTUNITIES :C     -  -  -\n\n")
         
         # Calculate the amount of time until the next scheduled run
         now = datetime.now()
@@ -119,6 +123,8 @@ if __name__ == "__main__":
     parser.add_argument("interval", default="1m", nargs="?", help="Kline interval (default: %(default)s)")
     parser.add_argument("up", type=float, default=90, nargs="?", help="Upper RSI threshold (default: %(default)s)")
     parser.add_argument("down", type=float, default=10, nargs="?", help="Lower RSI threshold (default: %(default)s)")
+    parser.add_argument('--no_show_logs', action='store_true', help='Prevent show all currency logs')
+    parser.add_argument('--not_send_message', action='store_true', help='Prevent send telegram message')
     parser.add_argument("--h", action="store_true", help="Show help message")
     args = parser.parse_args()
 
@@ -137,5 +143,5 @@ down       Lower RSI threshold (default: 10)
 ==========================================================================
 """)
     else:
-        main(args.interval, args.up, args.down)
+        main(args.interval, args.up, args.down, args.no_show_logs, args.not_send_message)
 
